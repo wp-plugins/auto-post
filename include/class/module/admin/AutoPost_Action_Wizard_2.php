@@ -3,7 +3,7 @@
  * Creates wizard pages for the 'Auto Post' action.
  * 
  * @package      Auto Post
- * @copyright    Copyright (c) 2014, Michael Uno
+ * @copyright    Copyright (c) 2014-2015, Michael Uno
  * @author       Michael Uno
  * @authorurl    http://michaeluno.jp
  * @since        1.0.0
@@ -19,23 +19,38 @@ final class AutoPost_Action_Wizard_2 extends TaskScheduler_Wizard_Action_Base {
     public function getFields() {
 
         $_aWizardOptions = apply_filters( 'task_scheduler_admin_filter_get_wizard_options', array(), $this->sSlug );
+        $_aTaxonomySlugs = array_keys( 
+            TaskScheduler_WPUtility::getTaxonomiesByPostTypeSlug( 
+                isset( $_aWizardOptions['auto_post_post_type'] ) 
+                    ? $_aWizardOptions['auto_post_post_type'] 
+                    : null 
+            )
+        );
+        $_sPostTypeSlug  = isset( $_aWizardOptions[ 'auto_post_post_type' ] ) 
+            ? $_aWizardOptions[ 'auto_post_post_type' ] 
+            : null;
+        $_sPostTypeLabel = TaskScheduler_WPUtility::getPostTypeLabel( 
+            $_sPostTypeSlug
+        );
         return array(
             array(    
                 'field_id'          => 'auto_post_post_type_label',
                 'title'             => __( 'Post Type', 'auto-post' ),
                 'type'              => 'text',
                 'attributes'        => array(
-                    'readonly'  => 'ReadOnly',
+                    'readonly'  => 'readonly',
                     'name'      => '',    // dummy
                 ),
-                'value'             => TaskScheduler_WPUtility::getPostTypeLabel( isset( $_aWizardOptions['auto_post_post_type'] ) ? $_aWizardOptions['auto_post_post_type'] : null ),
+                'value'             => $_sPostTypeLabel
+                    ? $_sPostTypeLabel
+                    : $_sPostTypeSlug,
             ),            
             array(    
                 'field_id'          => 'auto_post_post_status_label',
                 'title'             => __( 'Post Status', 'auto-post' ),
                 'type'              => 'text',
                 'attributes'        => array(
-                    'readonly'  => 'ReadOnly',
+                    'readonly'  => 'readonly',
                     'name'      => '',    // dummy
                 ),                
                 'value'             => $this->_getPostStatusLabel( isset( $_aWizardOptions['auto_post_post_status'] ) ? $_aWizardOptions['auto_post_post_status'] : null ),
@@ -44,7 +59,8 @@ final class AutoPost_Action_Wizard_2 extends TaskScheduler_Wizard_Action_Base {
                 'field_id'          => 'auto_post_term_ids',
                 'title'             => __( 'Terms', 'auto-post' ),
                 'type'              => 'taxonomy',
-                'taxonomy_slugs'    => array_keys( TaskScheduler_WPUtility::getTaxonomiesByPostTypeSlug( isset( $_aWizardOptions['auto_post_post_type'] ) ? $_aWizardOptions['auto_post_post_type'] : null ) )                         
+                'taxonomy_slugs'    => $_aTaxonomySlugs,
+                'if'                => count( $_aTaxonomySlugs ),
             ),         
             array(    
                 'field_id'          => 'auto_post_subject',
@@ -60,7 +76,21 @@ final class AutoPost_Action_Wizard_2 extends TaskScheduler_Wizard_Action_Base {
                 'title'             => __( 'Post Content', 'auto-post' ),
                 'type'              => 'textarea',
                 'rich'              => true,
-            ),                                                
+            ),
+            array(    
+                'field_id'          => 'auto_post_post_meta',
+                'title'             => __( 'Post Meta', 'auto-post' ),
+                'type'              => 'text',
+                'label'             => array(
+                    'key'     =>  __( 'Key', 'auto-post' ),
+                    'value'   =>  __( 'Value', 'auto-post' ),
+                ),
+                'repeatable'        => true,
+                'description'       => __( 'Set key-values of post meta data (custom fields).', 'auto-post' ),
+                'if'                => class_exists( 'TaskScheduler_Registry' ) 
+                    && version_compare( TaskScheduler_Registry::VERSION, '1.0.2b' ) >= 0
+                    
+            ),            
         );
         
     }    
@@ -83,11 +113,15 @@ final class AutoPost_Action_Wizard_2 extends TaskScheduler_Wizard_Action_Base {
             $aInput['submit']
             // $aInput['auto_post_post_type']
         );
-        
-// TaskScheduler_Debug::log( $aInput );
+        $aInput = $aInput + array(
+            // The taxonomy ids field can be not set depending on the previous user input.
+            // However, make sure here that the key exists.
+            'auto_post_term_ids' => null, 
+        );
+
         $_bIsValid = true;
         $_bIsValid = false;
-        $_aErrors = array();        
+        $_aErrors  = array();        
             
         if ( ! $_bIsValid ) {
 
